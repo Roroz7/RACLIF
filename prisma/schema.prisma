@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  password      String
+  role          Role      @default(USER)
+  discordId     String?   @unique
+  discordTag    String?
+  avatarUrl     String?
+  isDiscordLinked Boolean @default(false)
+  isOnServer    Boolean   @default(false)
+  isBanned      Boolean   @default(false)
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  orders        Order[]
+  licenses      License[]
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String    @db.Text
+  images      String[]
+  game        String
+  features    String[]
+  status      DetectionStatus @default(UNDETECTED)
+  isActive    Boolean   @default(true)
+  prices      Price[]
+  orders      Order[]
+  licenses    License[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Price {
+  id        String   @id @default(cuid())
+  duration  Int      // durée en jours (0 = lifetime)
+  label     String   // "1 jour", "7 jours", "30 jours", "Lifetime"
+  amount    Float    // prix en euros
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model License {
+  id          String        @id @default(cuid())
+  key         String        @unique
+  status      LicenseStatus @default(UNUSED)
+  hwid        String?
+  maxDevices  Int           @default(1)
+  productId   String
+  product     Product       @relation(fields: [productId], references: [id])
+  userId      String?
+  user        User?         @relation(fields: [userId], references: [id])
+  orderId     String?
+  order       Order?        @relation(fields: [orderId], references: [id])
+  activatedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime      @default(now())
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  status      OrderStatus @default(PENDING)
+  totalAmount Float
+  promoCode   String?
+  discount    Float       @default(0)
+  paymentId   String?     // Stripe/PayPal payment ID
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  productId   String
+  product     Product     @relation(fields: [productId], references: [id])
+  priceId     String
+  licenses    License[]
+  createdAt   DateTime    @default(now())
+}
+
+model PromoCode {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  type            PromoType // PERCENTAGE ou FIXED
+  value           Float     // ex: 20 pour 20% ou 5 pour 5€
+  maxUses         Int?
+  maxUsesPerUser  Int       @default(1)
+  currentUses     Int       @default(0)
+  minOrderAmount  Float?
+  applicableProducts String[] // product IDs, vide = tous
+  startsAt        DateTime  @default(now())
+  expiresAt       DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  type      LogType
+  message   String
+  metadata  Json?
+  userId    String?
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  USER
+  RESELLER
+  ADMIN
+}
+
+enum DetectionStatus {
+  UNDETECTED
+  DETECTED
+  MAINTENANCE
+  UPDATING
+}
+
+enum LicenseStatus {
+  UNUSED
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  DELIVERED
+  REFUNDED
+  CANCELLED
+}
+
+enum PromoType {
+  PERCENTAGE
+  FIXED
+}
+
+enum LogType {
+  AUTH
+  PURCHASE
+  LICENSE
+  ADMIN
+  PROMO
+  ERROR
+}
