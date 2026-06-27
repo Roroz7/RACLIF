@@ -11,7 +11,7 @@ RUN npm install --legacy-peer-deps
 
 # Copier le schéma Prisma et générer le client
 COPY prisma ./prisma
-RUN npx prisma generate
+RUN ./node_modules/.bin/prisma generate
 
 # Copier le code du bot
 COPY discord-bot ./discord-bot
