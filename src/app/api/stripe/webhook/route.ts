@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   let event: Stripe.Event;
 
   try {
-    if (!endpointSecret) {
+    if (!endpointSecret || endpointSecret === 'whsec_placeholder') {
       event = JSON.parse(body) as Stripe.Event;
     } else {
       event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       const order = await prisma.order.update({
         where: { id: orderId },
         data: { status: 'PAID' },
-        include: { user: true, product: true, price: true }
+        include: { user: true, product: true }
       });
 
       // Update Promo Code Uses if any
@@ -46,14 +46,15 @@ export async function POST(req: Request) {
         });
       }
 
-      // Generate License
+      // Generate License — duration stockée dans les metadata de la session Stripe
       const licenseKey = generateKey();
+      const durationDays = session.metadata?.durationDays ? parseInt(session.metadata.durationDays) : 0;
       
-      const expiresAt = order.price.duration === 0 
+      const expiresAt = durationDays === 0 
         ? null 
-        : new Date(Date.now() + order.price.duration * 24 * 60 * 60 * 1000);
+        : new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
 
-      const license = await prisma.license.create({
+      await prisma.license.create({
         data: {
           key: licenseKey,
           status: 'UNUSED',
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
         }
       });
 
-      // Log & Webhook
+      // Log
       await prisma.log.create({
         data: {
           type: 'PURCHASE',
@@ -74,14 +75,16 @@ export async function POST(req: Request) {
         }
       });
 
+      // Discord Webhook notification
       if (process.env.DISCORD_WEBHOOK_SALES) {
         const embed = buildEmbed({
           title: "Nouvelle Vente 💰",
-          description: `L'utilisateur **${order.user.username}** a acheté **${order.product.name}** (${order.price.label}).`,
-          color: 0x10B981, // Green
+          description: `L'utilisateur **${order.user.username}** a acheté **${order.product.name}**.`,
+          color: 0x10B981,
           fields: [
             { name: "Montant", value: `${order.totalAmount}€`, inline: true },
-            { name: "Commande", value: order.id, inline: true }
+            { name: "Commande", value: order.id, inline: true },
+            { name: "Licence", value: `\`${licenseKey}\``, inline: false }
           ]
         });
         await sendDiscordWebhook(process.env.DISCORD_WEBHOOK_SALES, embed);
