@@ -1,9 +1,4 @@
 import { Client, GatewayIntentBits, Collection, REST, Routes } from 'discord.js';
-import dotenv from 'dotenv';
-import path from 'path';
-
-// Charger l'environnement parent (racine du projet)
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const client = new Client({
     intents: [
@@ -38,7 +33,7 @@ async function main() {
 
     if (!token || !clientId) {
         console.error("⚠️ Missing DISCORD_BOT_TOKEN or DISCORD_CLIENT_ID");
-        return;
+        process.exit(1);
     }
 
     // Enregistrement des slash commands auprès de l'API Discord
@@ -61,9 +56,4 @@ async function main() {
     await client.login(token);
 }
 
-// Si le fichier est exécuté directement, on lance le bot
-if (require.main === module) {
-    main();
-}
-
-export default client;
+main();

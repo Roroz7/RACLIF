@@ -1,0 +1,21 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Installer les dépendances système
+RUN apk add --no-cache libc6-compat openssl
+
+# Copier le package.json et installer les deps
+COPY package.json ./
+RUN npm install --legacy-peer-deps
+
+# Copier le schéma Prisma et générer le client
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Copier le code du bot
+COPY discord-bot ./discord-bot
+COPY tsconfig.json ./tsconfig.json
+
+# Lancer le bot avec tsx (TypeScript direct)
+CMD ["npx", "tsx", "discord-bot/index.ts"]
